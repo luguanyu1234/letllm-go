@@ -1,13 +1,16 @@
 package main
 
 import (
+	"github.com/luguanyu1234/letllm-go/internal/config"
+	"github.com/luguanyu1234/letllm-go/internal/provider"
+	"github.com/luguanyu1234/letllm-go/internal/server"
 	"go.uber.org/fx"
 )
 
 func main() {
 	fx.New(
-		fx.Invoke(func() {
-			println("Hello World")
-		}),
+		config.Module,
+		provider.Module,
+		server.Module,
 	).Run()
 }
