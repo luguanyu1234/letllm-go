@@ -12,27 +12,36 @@ import (
 	"github.com/luguanyu1234/letllm-go/internal/config"
 	"github.com/luguanyu1234/letllm-go/internal/provider"
 	"go.uber.org/fx"
+	"github.com/gin-gonic/gin"
 )
 
-// Module provides the HTTP server lifecycle
+// Module provides the HTTP server lifecycle using Gin
 var Module = fx.Module("http-server",
-	fx.Provide(NewMux),
+	fx.Provide(NewEngine),
 	fx.Invoke(RegisterRoutes),
 	fx.Invoke(StartServer),
 )
 
-// NewMux constructs a new http.ServeMux
-func NewMux() *http.ServeMux { return http.NewServeMux() }
+// NewEngine constructs a new gin.Engine
+func NewEngine() *gin.Engine {
+	// Use release mode unless explicitly set otherwise by the caller
+	if gin.Mode() == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	r := gin.New()
+	r.Use(gin.Recovery())
+	return r
+}
 
 // StartServer starts the HTTP server and registers lifecycle hooks
-func StartServer(lc fx.Lifecycle, mux *http.ServeMux, cfg *config.Config) {
+func StartServer(lc fx.Lifecycle, engine *gin.Engine, cfg *config.Config) {
 	addr := cfg.Server.Addr
 	if addr == "" {
 		addr = ":8080"
 	}
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           engine,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -53,26 +62,22 @@ func StartServer(lc fx.Lifecycle, mux *http.ServeMux, cfg *config.Config) {
 	})
 }
 
-// RegisterRoutes wires handlers
-func RegisterRoutes(mux *http.ServeMux, r *provider.Router) {
-	mux.HandleFunc("/v1/chat/completions", func(w http.ResponseWriter, req *http.Request) {
-		if req.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+// RegisterRoutes wires handlers on Gin
+func RegisterRoutes(engine *gin.Engine, r *provider.Router) {
+	engine.POST("/v1/chat/completions", func(c *gin.Context) {
 		var in OpenAIChatCompletionRequest
-		if err := json.NewDecoder(req.Body).Decode(&in); err != nil {
-			http.Error(w, fmt.Sprintf("invalid json: %v", err), http.StatusBadRequest)
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid json: %v", err)})
 			return
 		}
 		if in.Model == "" {
-			http.Error(w, "model is required", http.StatusBadRequest)
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "model is required"})
 			return
 		}
 
 		p, err := r.ForModel(in.Model)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -80,18 +85,19 @@ func RegisterRoutes(mux *http.ServeMux, r *provider.Router) {
 		standardReq := convertToStandardRequest(&in)
 
 		if in.Stream {
-			w.Header().Set("Content-Type", "text/event-stream")
-			w.Header().Set("Cache-Control", "no-cache")
-			w.Header().Set("Connection", "keep-alive")
-			flusher, ok := w.(http.Flusher)
+			// SSE streaming compatible with OpenAI
+			c.Writer.Header().Set("Content-Type", "text/event-stream")
+			c.Writer.Header().Set("Cache-Control", "no-cache")
+			c.Writer.Header().Set("Connection", "keep-alive")
+			flusher, ok := c.Writer.(http.Flusher)
 			if !ok {
-				http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "streaming unsupported"})
 				return
 			}
 
-			rc, err := p.StreamGenerate(req.Context(), &provider.GenerateRequest{StandardRequest: standardReq})
+			rc, err := p.StreamGenerate(c.Request.Context(), &provider.GenerateRequest{StandardRequest: standardReq})
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 			defer rc.Close()
@@ -107,7 +113,6 @@ func RegisterRoutes(mux *http.ServeMux, r *provider.Router) {
 				for {
 					n, readErr := rc.Read(buf)
 					if n > 0 {
-						// copy to avoid overwriting backing array
 						cp := make([]byte, n)
 						copy(cp, buf[:n])
 						chunks <- cp
@@ -122,21 +127,19 @@ func RegisterRoutes(mux *http.ServeMux, r *provider.Router) {
 				}
 			}()
 
-			// sender loop: writes SSE to client
-			enc := json.NewEncoder(w)
+			enc := json.NewEncoder(c.Writer)
 			for {
 				select {
-				case <-req.Context().Done():
+				case <-c.Request.Context().Done():
 					return
 				case err := <-errCh:
 					if err != nil {
-						// terminate on read error
 						return
 					}
 				case b, ok := <-chunks:
 					if !ok {
 						// finished
-						w.Write([]byte("data: [DONE]\n\n"))
+						_, _ = c.Writer.Write([]byte("data: [DONE]\n\n"))
 						flusher.Flush()
 						return
 					}
@@ -149,27 +152,26 @@ func RegisterRoutes(mux *http.ServeMux, r *provider.Router) {
 						}},
 						Model: in.Model,
 					}
-					w.Write([]byte("data: "))
+					_, _ = c.Writer.Write([]byte("data: "))
 					if err := enc.Encode(payload); err != nil {
 						return
 					}
-					w.Write([]byte("\n"))
+					_, _ = c.Writer.Write([]byte("\n"))
 					flusher.Flush()
 				}
 			}
 		}
 
 		// Non-streaming
-		resp, err := p.Generate(req.Context(), &provider.GenerateRequest{StandardRequest: standardReq})
+		resp, err := p.Generate(c.Request.Context(), &provider.GenerateRequest{StandardRequest: standardReq})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		// Convert back to OpenAI format
 		out := convertFromStandardResponse(resp.StandardResponse)
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(out)
+		c.JSON(http.StatusOK, out)
 	})
 }
 

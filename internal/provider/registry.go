@@ -41,7 +41,7 @@ func NewRegistry(cfg *config.Config) (*Registry, error) {
 
 	// Initialize providers if API keys are present
 	if cfg.OpenAI.APIKey != "" {
-		p, err := NewOpenAIProvider(cfg.OpenAI.APIKey, cfg.OpenAI.DefaultModel)
+		p, err := NewOpenAIProvider(cfg.OpenAI.APIKey, cfg.OpenAI.BaseURL, cfg.OpenAI.DefaultModel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OpenAI provider: %w", err)
 		}
@@ -49,7 +49,7 @@ func NewRegistry(cfg *config.Config) (*Registry, error) {
 	}
 
 	if cfg.Gemini.APIKey != "" {
-		p, err := NewGeminiProvider(cfg.Gemini.APIKey, cfg.Gemini.DefaultModel)
+		p, err := NewGeminiProvider(cfg.Gemini.APIKey, cfg.Gemini.BaseURL, cfg.Gemini.DefaultModel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Gemini provider: %w", err)
 		}
@@ -84,13 +84,21 @@ func (r *Registry) GetProviderForModel(model string) (Provider, error) {
 	defer r.mu.RUnlock()
 
 	// Try model name-based routing as fallback
-	if strings.HasPrefix(model, "gpt-") || strings.HasPrefix(model, "gpt4") || strings.Contains(model, "gpt") {
+	// More flexible OpenAI routing - check for common patterns and openai-compatible models
+	if strings.HasPrefix(model, "gpt-") ||
+		strings.HasPrefix(model, "gpt4") ||
+		strings.Contains(model, "gpt") ||
+		strings.HasSuffix(model, "-openai") ||
+		strings.Contains(model, "openai") {
 		if provider, exists := r.providers["openai"]; exists {
 			return provider, nil
 		}
 	}
 
-	if strings.HasPrefix(model, "gemini-") {
+	// More flexible Gemini routing
+	if strings.HasPrefix(model, "gemini-") ||
+		strings.Contains(model, "gemini") ||
+		strings.HasSuffix(model, "-gemini") {
 		if provider, exists := r.providers["gemini"]; exists {
 			return provider, nil
 		}

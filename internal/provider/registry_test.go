@@ -10,16 +10,20 @@ func TestNewRegistry(t *testing.T) {
 	cfg := &config.Config{
 		OpenAI: struct {
 			APIKey       string `yaml:"api_key"`
+			BaseURL      string `yaml:"base_url"`
 			DefaultModel string `yaml:"default_model"`
 		}{
 			APIKey:       "test-openai-key",
+			BaseURL:      "",
 			DefaultModel: "gpt-4",
 		},
 		Gemini: struct {
 			APIKey       string `yaml:"api_key"`
+			BaseURL      string `yaml:"base_url"`
 			DefaultModel string `yaml:"default_model"`
 		}{
 			APIKey:       "test-gemini-key",
+			BaseURL:      "",
 			DefaultModel: "gemini-pro",
 		},
 	}
@@ -66,16 +70,20 @@ func TestRegistryRouting(t *testing.T) {
 		},
 		OpenAI: struct {
 			APIKey       string `yaml:"api_key"`
+			BaseURL      string `yaml:"base_url"`
 			DefaultModel string `yaml:"default_model"`
 		}{
 			APIKey:       "test-openai-key",
+			BaseURL:      "",
 			DefaultModel: "gpt-4",
 		},
 		Gemini: struct {
 			APIKey       string `yaml:"api_key"`
+			BaseURL      string `yaml:"base_url"`
 			DefaultModel string `yaml:"default_model"`
 		}{
 			APIKey:       "test-gemini-key",
+			BaseURL:      "",
 			DefaultModel: "gemini-pro",
 		},
 	}
@@ -134,7 +142,7 @@ func TestRegistryProviderManagement(t *testing.T) {
 	}
 
 	// Test registering a provider
-	mockProvider, err := NewOpenAIProvider("test-key", "gpt-4")
+	mockProvider, err := NewOpenAIProvider("test-key", "", "gpt-4")
 	if err != nil {
 		t.Fatalf("Failed to create mock provider: %v", err)
 	}
@@ -170,9 +178,11 @@ func TestRegistryClose(t *testing.T) {
 	cfg := &config.Config{
 		OpenAI: struct {
 			APIKey       string `yaml:"api_key"`
+			BaseURL      string `yaml:"base_url"`
 			DefaultModel string `yaml:"default_model"`
 		}{
 			APIKey:       "test-openai-key",
+			BaseURL:      "",
 			DefaultModel: "gpt-4",
 		},
 	}
@@ -193,9 +203,11 @@ func TestBackwardCompatibility(t *testing.T) {
 	cfg := &config.Config{
 		OpenAI: struct {
 			APIKey       string `yaml:"api_key"`
+			BaseURL      string `yaml:"base_url"`
 			DefaultModel string `yaml:"default_model"`
 		}{
 			APIKey:       "test-openai-key",
+			BaseURL:      "",
 			DefaultModel: "gpt-4",
 		},
 	}

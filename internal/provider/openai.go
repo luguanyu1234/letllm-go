@@ -18,7 +18,7 @@ type OpenAIProvider struct {
 }
 
 // NewOpenAIProvider creates a new OpenAI provider instance
-func NewOpenAIProvider(apiKey, modelName string) (*OpenAIProvider, error) {
+func NewOpenAIProvider(apiKey, baseURL, modelName string) (*OpenAIProvider, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("openai apiKey is required")
 	}
@@ -27,7 +27,15 @@ func NewOpenAIProvider(apiKey, modelName string) (*OpenAIProvider, error) {
 		modelName = "gpt-4o-mini"
 	}
 
-	client := openai.NewClient(apiKey)
+	// Create client with optional custom base URL
+	var client *openai.Client
+	if baseURL != "" {
+		config := openai.DefaultConfig(apiKey)
+		config.BaseURL = baseURL
+		client = openai.NewClientWithConfig(config)
+	} else {
+		client = openai.NewClient(apiKey)
+	}
 
 	// Define OpenAI capabilities
 	capabilities := ProviderCapabilities{

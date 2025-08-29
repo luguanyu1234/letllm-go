@@ -7,7 +7,7 @@ import (
 
 func TestProviderCapabilities(t *testing.T) {
 	// Test OpenAI provider capabilities
-	openaiProvider, err := NewOpenAIProvider("test-key", "gpt-4")
+	openaiProvider, err := NewOpenAIProvider("test-key", "", "gpt-4")
 	if err != nil {
 		t.Fatalf("Failed to create OpenAI provider: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestProviderCapabilities(t *testing.T) {
 	}
 
 	// Test Gemini provider capabilities
-	geminiProvider, err := NewGeminiProvider("test-key", "gemini-pro")
+	geminiProvider, err := NewGeminiProvider("test-key", "", "gemini-pro")
 	if err != nil {
 		t.Fatalf("Failed to create Gemini provider: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestProviderCapabilities(t *testing.T) {
 
 func TestProviderInfo(t *testing.T) {
 	// Test OpenAI provider info
-	openaiProvider, err := NewOpenAIProvider("test-key", "gpt-4")
+	openaiProvider, err := NewOpenAIProvider("test-key", "", "gpt-4")
 	if err != nil {
 		t.Fatalf("Failed to create OpenAI provider: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestProviderInfo(t *testing.T) {
 	}
 
 	// Test Gemini provider info
-	geminiProvider, err := NewGeminiProvider("test-key", "gemini-pro")
+	geminiProvider, err := NewGeminiProvider("test-key", "", "gemini-pro")
 	if err != nil {
 		t.Fatalf("Failed to create Gemini provider: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestProviderInfo(t *testing.T) {
 }
 
 func TestRequestValidation(t *testing.T) {
-	openaiProvider, err := NewOpenAIProvider("test-key", "gpt-4")
+	openaiProvider, err := NewOpenAIProvider("test-key", "", "gpt-4")
 	if err != nil {
 		t.Fatalf("Failed to create OpenAI provider: %v", err)
 	}

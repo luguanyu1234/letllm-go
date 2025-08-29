@@ -20,13 +20,23 @@ type GeminiProvider struct {
 }
 
 // NewGeminiProvider creates a new Gemini provider instance
-func NewGeminiProvider(apiKey, modelName string) (*GeminiProvider, error) {
+func NewGeminiProvider(apiKey, baseURL, modelName string) (*GeminiProvider, error) {
 	if modelName == "" {
 		modelName = "gemini-pro"
 	}
 
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+
+	// Create client with optional custom base URL
+	var client *genai.Client
+	var err error
+	if baseURL != "" {
+		// For Gemini, we need to set the endpoint through the option
+		client, err = genai.NewClient(ctx, option.WithAPIKey(apiKey), option.WithEndpoint(baseURL))
+	} else {
+		client, err = genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
